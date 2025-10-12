@@ -126,7 +126,7 @@ _readKeyboard:		LD	B,39
 @readAllKeys:   	IN	A,(C)
 		        LD	(HL),A
 		        INC	HL      
-		        LD	DE,$05FF
+		        LD	DE,$0501
 
 @doAll: 		SRL	A
 		        JR 	C,@notset

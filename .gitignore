@@ -2,6 +2,7 @@
 #
 /notes.txt
 /*.nex
+**.nex
 .DS_Store
 *.lis
 *.list
@@ -11,3 +12,4 @@
 *.idx
 *.blend1
 *.mtl
+cspect_win.dat

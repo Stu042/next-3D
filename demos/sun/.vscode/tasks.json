@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "make",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Deploy",
+      "type": "shell",
+      "command": "make install",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },	
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "make clean",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run in ZEsarUX",
+      "type": "shell",
+      "command": "open -a zesarux --args ${workspaceFolder}/sun.nex",
+      "dependsOn": ["Build"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run in CSpect",
+      "type": "shell",
+      "command": "mono ~/Tools/CSpect/CSpect.exe -brk -zxnext -nextrom -exit -brk -w4 -basickeys -mouse ${workspaceFolder}/${fileDirnameBasename}.nex",
+      "dependsOn": ["Build"],
+      "problemMatcher": []
+    },
+  ]
+}

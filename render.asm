@@ -13,8 +13,9 @@
 
     			INCLUDE "globals.inc"
 
+PUBLIC offScreenBank
 screen_banks:		DB 0				; LSB: The visible screen
-			DB 0				; MSB: The offscreen buffer
+offScreenBank:		DB 0				; MSB: The offscreen buffer
 
 shapeT_X1:		EQU	scratchpad 
 shapeT_X2:		EQU	scratchpad + $100

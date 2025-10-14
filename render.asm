@@ -13,10 +13,8 @@
 
     			INCLUDE "globals.inc"
 
-PUBLIC offScreenBank
 screen_banks:		DB 0				; LSB: The visible screen
-offScreenBank:		DB 0				; MSB: The offscreen buffer
-
+			DB 0
 shapeT_X1:		EQU	scratchpad 
 shapeT_X2:		EQU	scratchpad + $100
 
@@ -52,6 +50,11 @@ DRAW_LINE_TABLE		MACRO	FLAG,PX1,PY1,PX2,PY2,TABLE
 S1:
 			ENDM
 
+
+PUBLIC _setPage
+_setPage:		LD	A,L		; A: mem page
+			NEXTREG 50h,A           ; Set mem page
+    			RET
 
 ; void initL2(void)
 ; Initialises the Layer 2 Next screen mode into 256x192 256 colours in front of the ULA screen
@@ -136,7 +139,7 @@ get_pixel_address_y:	LD 	A,(screen_banks+1)
 			NEXTREG MMU_REGISTER_0, A	; And set it
 			LD	A,B
 			AND	%00011111
-			LD	H,A 
+			LD	H,A
 			RET 
 
 ; extern void plotL2(uint8_t xcoord, uint8_t ycoord, uint8_t colour) __z88dk_callee
@@ -544,165 +547,165 @@ circlePlot_Q8:		LD	A,C			; SUB the X coordinate to the circle centre Y
 ; extern void circleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
 ; A filled circle drawing routine
 ;=================================================================================================
-PUBLIC _circleL2F, circleL2F
+; PUBLIC _circleL2F, circleL2F
 
-_circleL2F:		POP 	IY			; Pops SP into IY
-			POP 	BC			; BC: pt.x
-			POP	DE			; DE: pt.y
-			POP 	HL 			; HL: Radius
-			DEC	SP
-			POP	AF			;  A: Colour
-			PUSH 	IY			; Restore the stack
-			PUSH 	IX
-			CALL 	circleL2F
-			POP 	IX 
-			RET
+; _circleL2F:		POP 	IY			; Pops SP into IY
+; 			POP 	BC			; BC: pt.x
+; 			POP	DE			; DE: pt.y
+; 			POP 	HL 			; HL: Radius
+; 			DEC	SP
+; 			POP	AF			;  A: Colour
+; 			PUSH 	IY			; Restore the stack
+; 			PUSH 	IX
+; 			CALL 	circleL2F
+; 			POP 	IX 
+; 			RET
 
-; Draw a filled circle
-; BC: X pixel position of circle centre
-; DE: Y pixel position of circle centre
-;  L: Radius
-;  A: Colour
-;
-circleL2F:		LD	(circleL2F_C+1),A	; Store the colour
-			LD	A,L			;  A: radius
-			AND	A			; Check for zero sized circles
-			RET	Z
-;
-			PUSH 	AF			; Stack the radius
-			CALL	circleInit		; Initialise the circle parameters
-@L1:			EXX
-			LD	H,shapeT_X1 >> 8	; The left-hand half of the circle
-			CALL	circlePlotF_Q3		; Call the plot routines
-			CALL	circlePlotF_Q4
-			CALL	circlePlotF_Q7
-			CALL	circlePlotF_Q8
-			LD	H,shapeT_X2 >> 8	; The right-hand half of the circle
-			CALL	circlePlotF_Q1
-			CALL	circlePlotF_Q2
-			CALL	circlePlotF_Q5
-			CALL	circlePlotF_Q6
-			EXX
-			CALL	circleNext		; Calculate the next pixel position
-			JR	NC,@L1			; Loop until finished
-			POP	AF			; Pop the radius
-;
-			EXX				; BC: X origin, DE: Y origin
-			LD	H,A			;  H: radius
-			LD 	A,E			; Get the Y origin
-			SUB	H			; Subtract the radius
-			JR	NC, @M1			; Skip next bit if OK
-			XOR	A			; Set to zero if off top of screen
-@M1:			LD	L,A 			;  L: Top pixel row value 
+; ; Draw a filled circle
+; ; BC: X pixel position of circle centre
+; ; DE: Y pixel position of circle centre
+; ;  L: Radius
+; ;  A: Colour
+; ;
+; circleL2F:		LD	(circleL2F_C+1),A	; Store the colour
+; 			LD	A,L			;  A: radius
+; 			AND	A			; Check for zero sized circles
+; 			RET	Z
+; ;
+; 			PUSH 	AF			; Stack the radius
+; 			CALL	circleInit		; Initialise the circle parameters
+; @L1:			EXX
+; 			LD	H,shapeT_X1 >> 8	; The left-hand half of the circle
+; 			CALL	circlePlotF_Q3		; Call the plot routines
+; 			CALL	circlePlotF_Q4
+; 			CALL	circlePlotF_Q7
+; 			CALL	circlePlotF_Q8
+; 			LD	H,shapeT_X2 >> 8	; The right-hand half of the circle
+; 			CALL	circlePlotF_Q1
+; 			CALL	circlePlotF_Q2
+; 			CALL	circlePlotF_Q5
+; 			CALL	circlePlotF_Q6
+; 			EXX
+; 			CALL	circleNext		; Calculate the next pixel position
+; 			JR	NC,@L1			; Loop until finished
+; 			POP	AF			; Pop the radius
+; ;
+; 			EXX				; BC: X origin, DE: Y origin
+; 			LD	H,A			;  H: radius
+; 			LD 	A,E			; Get the Y origin
+; 			SUB	H			; Subtract the radius
+; 			JR	NC, @M1			; Skip next bit if OK
+; 			XOR	A			; Set to zero if off top of screen
+; @M1:			LD	L,A 			;  L: Top pixel row value 
 
-			LD	A,E			; Get the Y origin
-			ADD	H			; Add the radius
-			CP	192 			; Check bottom screen boundary
-			JR	C,@M2			; If off bottom then
-			LD	A,191			; Crop to 191
-@M2:			SUB	L 			; Subtract the top
-			INC	A			; Because height = bottom - top + 1
-			LD	B,A			;  B: height of circle
-circleL2F_C:		LD	A,0			;  A: colour
-			JP 	drawShapeTable		; Draw the table
+; 			LD	A,E			; Get the Y origin
+; 			ADD	H			; Add the radius
+; 			CP	192 			; Check bottom screen boundary
+; 			JR	C,@M2			; If off bottom then
+; 			LD	A,191			; Crop to 191
+; @M2:			SUB	L 			; Subtract the top
+; 			INC	A			; Because height = bottom - top + 1
+; 			LD	B,A			;  B: height of circle
+; circleL2F_C:		LD	A,0			;  A: colour
+; 			JP 	drawShapeTable		; Draw the table
 
 
-; Plot the 8 quadrants of a filled circle
-; Right-Bottom #1
-;
-circlePlotF_Q1:		LD	A,E			; ADD the Y coordinate to the circle centre Y
-			ADD	IXH
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; ADD the X coordinate to the circle centre X
-			ADD	IXL
-			JR	NC,@M1
-			LD	A,255
-@M1:			LD	(HL),A
-			RET
-;
-; Right-Bottom #2
-;
-circlePlotF_Q2:		LD	A,E			; ADD the X coordinate to the circle centre Y
-			ADD	IXL
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; ADD the Y coordinate to the circle centre X
-			ADD	IXH
-			JR	NC,@M1
-			LD	A,255
-@M1:			LD	(HL),A
-			RET
-;
-; Left-Bottom #1
-;
-circlePlotF_Q3:		LD	A,E			; ADD the Y coordinate to the circle centre X
-			ADD	IXH
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; SUB the X coordinate to the circle centre Y
-			SUB	IXL
-			JR	NC,@M1
-			XOR	A
-@M1:			LD	(HL),A
-			RET
-;
-; Left-Bottom #2
-;
-circlePlotF_Q4:		LD	A,E			; ADD the X coordinate to the circle centre Y
-			ADD	IXL
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; SUB the Y coordinate to the circle centre X
-			SUB	IXH
-			JR	NC,@M1
-			XOR	A
-@M1:			LD	(HL),A
-			RET
-;
-; Right-Top #1
-;
-circlePlotF_Q5:		LD	A,E			; SUB the Y coordinate to the circle centre X
-			SUB	IXH
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; ADD the X coordinate to the circle centre Y
-			ADD	IXL
-			JR	NC,@M1
-			LD	A,255
-@M1:			LD	(HL),A
-			RET
-;
-; Right-Top #2
-;
-circlePlotF_Q6:		LD	A,E			; SUB the X coordinate to the circle centre Y
-			SUB	IXL
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; ADD the Y coordinate to the circle centre X
-			ADD	IXH
-			JR	NC,@M1
-			LD	A,255
-@M1:			LD	(HL),A
-			RET
-;
-; Left-Top #1
-;
-circlePlotF_Q7:		LD	A,E			; SUB the Y coordinate to the circle centre
-			SUB	IXH
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; SUB the X coordinate to the circle centre
-			SUB	IXL
-			JR	NC,@M1
-			XOR	A
-@M1:			LD	(HL),A
-			RET
-;
-; Left-Top #2
-;
-circlePlotF_Q8:		LD	A,E			; SUB the X coordinate to the circle centre
-			SUB	IXL
-			LD	L,A			; L: Offset into the table
-			LD	A,C			; SUB the Y coordinate to the circle centre
-			SUB	IXH
-			JR	NC,@M1
-			XOR	A
-@M1:			LD	(HL),A
-			RET
+; ; Plot the 8 quadrants of a filled circle
+; ; Right-Bottom #1
+; ;
+; circlePlotF_Q1:		LD	A,E			; ADD the Y coordinate to the circle centre Y
+; 			ADD	IXH
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; ADD the X coordinate to the circle centre X
+; 			ADD	IXL
+; 			JR	NC,@M1
+; 			LD	A,255
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Right-Bottom #2
+; ;
+; circlePlotF_Q2:		LD	A,E			; ADD the X coordinate to the circle centre Y
+; 			ADD	IXL
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; ADD the Y coordinate to the circle centre X
+; 			ADD	IXH
+; 			JR	NC,@M1
+; 			LD	A,255
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Left-Bottom #1
+; ;
+; circlePlotF_Q3:		LD	A,E			; ADD the Y coordinate to the circle centre X
+; 			ADD	IXH
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; SUB the X coordinate to the circle centre Y
+; 			SUB	IXL
+; 			JR	NC,@M1
+; 			XOR	A
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Left-Bottom #2
+; ;
+; circlePlotF_Q4:		LD	A,E			; ADD the X coordinate to the circle centre Y
+; 			ADD	IXL
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; SUB the Y coordinate to the circle centre X
+; 			SUB	IXH
+; 			JR	NC,@M1
+; 			XOR	A
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Right-Top #1
+; ;
+; circlePlotF_Q5:		LD	A,E			; SUB the Y coordinate to the circle centre X
+; 			SUB	IXH
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; ADD the X coordinate to the circle centre Y
+; 			ADD	IXL
+; 			JR	NC,@M1
+; 			LD	A,255
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Right-Top #2
+; ;
+; circlePlotF_Q6:		LD	A,E			; SUB the X coordinate to the circle centre Y
+; 			SUB	IXL
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; ADD the Y coordinate to the circle centre X
+; 			ADD	IXH
+; 			JR	NC,@M1
+; 			LD	A,255
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Left-Top #1
+; ;
+; circlePlotF_Q7:		LD	A,E			; SUB the Y coordinate to the circle centre
+; 			SUB	IXH
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; SUB the X coordinate to the circle centre
+; 			SUB	IXL
+; 			JR	NC,@M1
+; 			XOR	A
+; @M1:			LD	(HL),A
+; 			RET
+; ;
+; ; Left-Top #2
+; ;
+; circlePlotF_Q8:		LD	A,E			; SUB the X coordinate to the circle centre
+; 			SUB	IXL
+; 			LD	L,A			; L: Offset into the table
+; 			LD	A,C			; SUB the Y coordinate to the circle centre
+; 			SUB	IXH
+; 			JR	NC,@M1
+; 			XOR	A
+; @M1:			LD	(HL),A
+; 			RET
 
 
 ; extern void lineT(Point8 pt0, Point8 pt1, uint8_t table) __z88dk_callee
@@ -987,3 +990,231 @@ draw_horz_line_dst:	DW	0			; Destination address
 			DB	$87			; R6-Enable DMA
 
 			DC 	draw_horz_line_dma_len = (ASMPC - draw_horz_line_dma) * 256 + Z80DMAPORT
+
+; extern void circleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
+; A filled circle drawing routine
+;=================================================================================================
+PUBLIC _mycircleL2F, mycircleL2F
+
+_mycircleL2F:		POP 	IY			; Pops SP into IY
+			POP 	BC			; BC: pt.x
+			POP	DE			; DE: pt.y
+			POP 	HL 			; HL: Radius
+			DEC	SP
+			POP	AF			; A: Colour
+			PUSH 	IY			; Restore the stack
+			PUSH 	IX
+			CALL 	mycircleL2F
+			POP 	IX 
+			RET
+
+; Draw a filled circle
+; BC: X pixel position of circle centre
+; DE: Y pixel position of circle centre
+;  L: Radius
+;  A: Colour
+;
+mycircleL2F:
+			LD	(@colour),A		; Store the colour
+			LD	A,L			; A: radius
+			AND	A			; Check for zero sized circles
+			RET	Z
+			
+			; init variables
+			ld	(@radius),a
+			ld	(@xCoord),bc
+			ld	(@yCoord),de
+			ld	hl,0
+			ld	(@tableIndex),hl	; reset table index from last run
+
+			; calculate step through the table of line widths
+			ld	bc,65535
+			ld	a,(@radius)
+			ld	e,a
+			call	Div16by8
+			ld	(@deltaTableIndex),bc	; amount we step through the line width table by * 256
+			
+			; calc y coords, start and end
+
+			; bottom y coord first
+			ld	de,(@yCoord)
+			ld	a,(@radius)
+			add	de,a			; add radius from y middle coord
+			ld	a,e
+			ld	(@lastLineLo),a		; bottom Y coord
+
+			; top y coord
+			ld	hl,(@yCoord)
+			ld	a,(@radius)
+			ld	e,a
+			ld	d,0
+			sbc	hl,de			; sub radius from y middle coord
+			ld	a,l
+@nextRow:
+			ld	(@lineLo),a		; top Y coord
+			cp	191			; is top Y off the bottom of the display?
+			jp	p,@yCoordBelowTop	; no, so continue
+			ret
+
+@yCoordBelowTop:	; y coord is above bottom of display and we have the range of rows to render
+
+			ld	b,a
+			ld	a,(@lastLineLo)		; does line = last line?
+			cp	b
+			jr	nz,@notLastRow	; if we have reached last line exit
+			ret
+@notLastRow:
+			; calc table index - incase we have a renderable line coming up
+			ld	hl,(@deltaTableIndex)	; step in table index
+			ld	bc,(@tableIndex)	; current integer and fraction of index
+			add	hl,bc			; h = integer index
+			ld	(@tableIndex),hl	; save new current integer and fraction of index for next time
+
+			; calc line width
+			ld	a,(@tableIndex)		; A = integer table index
+			ld	hl,@lineWidths		; HL = table address
+			add	hl,a			; HL current line width address
+			ld	e,(hl)			; half line width (0-255)
+			ld	a,(@radius)
+			ld	d,a
+			mul	d,e			; d = line width * radius / 256
+
+			; calc left and right sides of line
+			; right first
+			ld	a,d			; d = line width * radius / 256
+			ld	hl,(@xCoord)
+			add	hl,a
+
+			; clamp right
+			call	@clampHLToA
+			ld	(@rightLo),a
+
+			; calc left
+			ld	hl,(@xCoord)
+			ld	c,d			; d = line width * radius / 256
+			ld	b,0
+			sbc	hl,bc
+
+			; clamp left
+			call	@clampHLToA
+			ld	(@leftLo),a
+
+			; get actual line width
+			ld	a,(@leftLo)
+			ld	c,a
+			ld	a,(@rightLo)		; A = line width
+			sub	a,c
+			jr	z,@nextLine		; if no width dont render
+			ld	e,a			; E = line width
+
+			; start rendering
+
+			; get screen address at (left, line)
+			ld	a,(@lineLo)
+			ld	b,a
+			ld	a,(@leftLo)
+			ld	c,a
+			call	get_pixel_address	; HL = first pixel display address
+
+			ld	b,e			; B = line width
+			ld	a,(@colour)
+@nextPixel:
+			ld	(hl),a
+			inc	hl
+			djnz	@nextPixel
+
+			; ld	a,(@leftLo)
+			; ld	d,a
+			; ld	a,(@rightLo)
+			; ld	e,a
+			; call draw_horz_line
+
+@nextLine:		;get ready to start rendering next line
+			ld	a,(@lineLo)
+			inc	a
+			jr	@nextRow
+
+@clampHLToA:	; clamp 0 >= HL <= 255, A is result
+			ld	a,h			; Check if H >= 1 (HL >= 256)
+			or	a
+			jr	z,@clampDone
+			ld	a,255			; If H > 0, HL >= 256, so clamp to 255
+			ret
+@clampDone:		; HL is betwen 0 and 255 (inclusive)
+			ld	a,l
+			ret
+
+
+@data:
+@colour:		db 0	; pixel colour
+@radius:		db 0	; circle radius
+@tableIndex:		dw 0	; integer and fraction of index into line width table
+@deltaTableIndex:	dw 0	; full step of change in index into line width table
+@lineLo: 		db 0	; lo current line
+@lastLineLo:		db 0	; end line
+@xCoord:		dw 0	; x coord (middle)
+@yCoord:		dw 0	; y coord (middle)
+@leftLo:		db 0	; lo left x coord
+@rightLo:		db 0	; lo right x coord
+
+@lineWidths:
+	db	23, 32, 39, 45, 50, 55, 59, 63, 67, 71, 74, 77, 80, 83, 86, 89
+	db	92, 94, 97, 99, 101, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124
+	db	125, 127, 129, 131, 132, 134, 136, 137, 139, 140, 142, 143, 145, 146, 148, 149
+	db	150, 152, 153, 154, 156, 157, 158, 159, 161, 162, 163, 164, 165, 167, 168, 169
+	db	170, 171, 172, 173, 174, 175, 177, 178, 179, 180, 181, 182, 183, 184, 185, 185
+	db	186, 187, 188, 189, 190, 191, 192, 193, 194, 194, 195, 196, 197, 198, 199, 199
+	db	200, 201, 202, 202, 203, 204, 205, 205, 206, 207, 208, 208, 209, 210, 210, 211
+	db	212, 212, 213, 214, 214, 215, 216, 216, 217, 218, 218, 219, 219, 220, 221, 221
+	db	222, 222, 223, 223, 224, 224, 225, 226, 226, 227, 227, 228, 228, 229, 229, 230
+	db	230, 231, 231, 231, 232, 232, 233, 233, 234, 234, 235, 235, 235, 236, 236, 237
+	db	237, 237, 238, 238, 239, 239, 239, 240, 240, 240, 241, 241, 241, 242, 242, 242
+	db	243, 243, 243, 244, 244, 244, 245, 245, 245, 245, 246, 246, 246, 247, 247, 247
+	db	247, 248, 248, 248, 248, 249, 249, 249, 249, 249, 250, 250, 250, 250, 250, 251
+	db	251, 251, 251, 251, 252, 252, 252, 252, 252, 252, 252, 253, 253, 253, 253, 253
+	db	253, 253, 253, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 255
+	db	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+
+; Divide 16-bit values (with 16-bit result)
+; In: Divide BC by divider E
+; Out: BC = result, HL = remainder
+; 1297 + 7 T-states to complete
+Div16by8:
+			ld d,0
+
+; Divide 16-bit values (with 16-bit result)
+; In: Divide BC by divider DE
+; Out: BC = result, HL = remainder
+; Thanks to Flyguille for the Div16 routine, taken from his MNBIOS source code
+; 1297 T-states to complete
+Div16:
+			ld	hl,0
+			ld	a,b
+			ld	b,8
+@div16_Loop1:
+			rla
+			adc	hl,hl
+			sbc	hl,de
+			jr	nc,@div16_NoAdd1
+			add	hl,de
+@div16_NoAdd1:
+			djnz	@div16_Loop1
+			rla
+			cpl
+			ld	b,a
+			ld	a,c
+			ld	c,b
+			ld	b,8
+@div16_Loop2:
+			rla
+			adc	hl,hl
+			sbc	hl,de
+			jr	nc,@div16_NoAdd2
+			add	hl,de
+@div16_NoAdd2:
+			djnz	@div16_Loop2
+			rla
+			cpl
+			ld	b,c
+			ld	c,a
+			ret

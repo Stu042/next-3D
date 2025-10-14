@@ -42,13 +42,13 @@ extern void lineL2(Point8 pt0, Point8 pt1, uint8 colour) __z88dk_callee;
 extern void triangleL2(Point8 pt0, Point8 pt1, Point8 pt2, uint8 colour) __z88dk_callee;
 extern void triangleL2F(Point8 pt0, Point8 pt1, Point8 pt2, uint8 colour) __z88dk_callee;
 extern void circleL2(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
-extern void circleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
+// extern void circleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
 
 extern void lineT(Point8 pt0, Point8 pt1, uint8_t table) __z88dk_callee;
 extern void drawShapeTable(uint8_t y, uint8_t h, uint8 colour) __z88dk_callee;
 
-extern uint8_t* getPixelAddress(uint8 y, uint8 x) __z88dk_callee;
-extern uint8_t offScreenBank;
+extern void setPage(uint8 page) __z88dk_fastcall;
+extern void mycircleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
 
 
 #endif 	//__RENDER_H__

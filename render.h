@@ -49,6 +49,7 @@ extern void drawShapeTable(uint8_t y, uint8_t h, uint8 colour) __z88dk_callee;
 
 extern void setPage(uint8 page) __z88dk_fastcall;
 extern void circleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
+extern void newCircleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
 
 
 #endif 	//__RENDER_H__

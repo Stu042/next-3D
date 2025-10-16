@@ -298,7 +298,7 @@
 
 
 uint8_t	renderMode = 1;					// 0: Wireframe, 1: Filled
-Point16_3D sun_pos = { 0, 0, 30000 };	// The sun position
+Point16_3D sun_pos = { 0, 0, 20000 };	// The sun position
 Object_3D object[MAX_OBJECTS];			// List of objects to display
 
 
@@ -487,13 +487,31 @@ void TestMyCircle() {
 // Code entry
 void main(void) {
 	init();
+	Point16 t = {
+		128,
+		96,
+	};
 	while(1) {
 		clearL2(0);
-		readKeyboard();
-		Run();
-		//TestMyCircle();
 
-		//waitVBlank();	// Wait for the vblank before switching
+		zx_border(INK_YELLOW);
+		newCircleL2F(t, 50, 0xFC);
+		zx_border(INK_GREEN);
+
+		waitVBlank();	// Wait for the vblank before switching
+		zx_border(INK_RED);
+		swapL2(); 		// Do the double-buffering
+	};
+
+	while(1) {
+		clearL2(0);
+
+		zx_border(INK_YELLOW);
+		circleL2F(t, 50, 0xFC);
+		zx_border(INK_GREEN);
+
+		waitVBlank();	// Wait for the vblank before switching
+		zx_border(INK_RED);
 		swapL2(); 		// Do the double-buffering
 	};
 }

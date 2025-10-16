@@ -1,3 +1,25 @@
+# Enjoying Messing With Z80
+
+## Annoying Result
+
+Now my filled circle function, using table of line widths, is annoying slower than the original!
+
+Now to be fair my code is not optimised at all, in fact each component of my function is coded to be completely seperate from the other components, i.e. no shared register values, but I was expecting it to be closer at least.
+
+I think my code is about 25% slower...
+
+
+### Original filled circle
+![original filled circle](docimages/circle.png)
+
+### My filled circle
+![my filled circle](docimages/newCircle.png)
+
+
+## FYI
+
+Border is set to red, then wait for clear screen, border set to yellow as I render the circle, then to green as we wait for vblank anmd swap the buffers. Also my filled circle is not rendering the last line and the sides are one picxel too small - gives me something to look into.
+
 # Next3D - a 3D engine for the ZX Spectrum Next
 
 ## v0.5 BETA (Not production ready)

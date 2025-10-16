@@ -298,7 +298,7 @@
 
 
 uint8_t	renderMode = 1;					// 0: Wireframe, 1: Filled
-Point16_3D sun_pos = { 0, 0, 20000 };	// The sun position
+Point16_3D sun_pos = { 0, 0, 30000 };	// The sun position
 Object_3D object[MAX_OBJECTS];			// List of objects to display
 
 
@@ -312,7 +312,7 @@ void init() {
 	NextReg(0x15,0x21);			// Enable sprites and clipping, SLU priority
 	setCPU(3);					// 28Mhz
 	initL2();
-	zx_border(INK_BLACK);
+	zx_border(INK_RED);
 }
 
 
@@ -391,8 +391,8 @@ void RenderCircleF(const Point16 pos, const int16_t radius, const uint8_t colour
 
 					if (!positiveThroughTable) {
 						uint8 bankOffset = line >> 5;
-						uint8 bank = offScreenBank + bankOffset;
-						setPage(bank);
+						//uint8 bank = offScreenBank + bankOffset;
+						//setPage(bank);
 						uint8 *de = (uint8 *)((uint16)left | ((uint16)line & 0x1f));
 
 						const uint8 width = (uint8)(right - left);
@@ -426,7 +426,7 @@ void drawSun() {
 		int16_t r = (32768-p.z)/256;
 		if(r > 0) {
 			if(renderMode) {
-				mycircleL2F(t, r, 0xFC);
+				circleL2F(t, r, 0xFC);
 				//RenderCircleF(t, r, 0xFC);
 				//circleL2F(t,r,0xFC);
 			}
@@ -477,10 +477,10 @@ void Run() {
 
 void TestMyCircle() {
 	Point16 t = {
-				100,
-				100,
-			};
-	mycircleL2F(t, 50, 0xFC);
+		100,
+		100,
+	};
+	circleL2F(t, 50, 0xFC);
 }
 
 //////////////////////////////////////

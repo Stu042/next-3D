@@ -140,7 +140,10 @@ get_pixel_address_y:	LD 	A,(screen_banks+1)
 			LD	A,B
 			AND	%00011111
 			LD	H,A
-			RET 
+			RET
+
+
+
 
 ; extern void plotL2(uint8_t xcoord, uint8_t ycoord, uint8_t colour) __z88dk_callee
 ; Generic plotting routine that can be called from C
@@ -994,9 +997,9 @@ draw_horz_line_dst:	DW	0			; Destination address
 ; extern void circleL2F(Point16 pt, uint16 radius, uint8 colour) __z88dk_callee;
 ; A filled circle drawing routine
 ;=================================================================================================
-PUBLIC _mycircleL2F, mycircleL2F
+PUBLIC _circleL2F, circleL2F
 
-_mycircleL2F:		POP 	IY			; Pops SP into IY
+_circleL2F:		POP 	IY			; Pops SP into IY
 			POP 	BC			; BC: pt.x
 			POP	DE			; DE: pt.y
 			POP 	HL 			; HL: Radius
@@ -1004,7 +1007,7 @@ _mycircleL2F:		POP 	IY			; Pops SP into IY
 			POP	AF			; A: Colour
 			PUSH 	IY			; Restore the stack
 			PUSH 	IX
-			CALL 	mycircleL2F
+			CALL 	circleL2F
 			POP 	IX 
 			RET
 
@@ -1014,7 +1017,7 @@ _mycircleL2F:		POP 	IY			; Pops SP into IY
 ;  L: Radius
 ;  A: Colour
 ;
-mycircleL2F:
+circleL2F:
 			LD	(@colour),A		; Store the colour
 			LD	A,L			; A: radius
 			AND	A			; Check for zero sized circles
@@ -1026,58 +1029,74 @@ mycircleL2F:
 			ld	(@yCoord),de
 			ld	hl,0
 			ld	(@tableIndex),hl	; reset table index from last run
+			xor	a
+			ld	(@tableIndexDirection),a
 
 			; calculate step through the table of line widths
 			ld	bc,65535
 			ld	a,(@radius)
 			ld	e,a
-			call	Div16by8
+			call	BcDivE
 			ld	(@deltaTableIndex),bc	; amount we step through the line width table by * 256
 			
 			; calc y coords, start and end
 
 			; bottom y coord first
-			ld	de,(@yCoord)
-			ld	a,(@radius)
-			add	de,a			; add radius from y middle coord
-			ld	a,e
-			ld	(@lastLineLo),a		; bottom Y coord
+			ld	hl,(@yCoord)
+			ld	bc,192
+			call	clampHLBy0AndBC
+			ld	(@lastLine),hl		; bottom Y coord (for top half of circle)
 
 			; top y coord
 			ld	hl,(@yCoord)
 			ld	a,(@radius)
 			ld	e,a
 			ld	d,0
+			or	a
 			sbc	hl,de			; sub radius from y middle coord
-			ld	a,l
-@nextRow:
-			ld	(@lineLo),a		; top Y coord
-			cp	191			; is top Y off the bottom of the display?
-			jp	p,@yCoordBelowTop	; no, so continue
-			ret
+			ld	(@line),hl		; top Y coord
 
-@yCoordBelowTop:	; y coord is above bottom of display and we have the range of rows to render
+@nextRow:		; start of next row, first check we are on display in y direction
+			ld	hl,(@line)
+			ld	bc,192
+			or	a
+			sbc	hl,bc
+			jr	c,@linePlus192Negative
+			ret				; EXIT HERE, if positive then below bottom of display
+@linePlus192Negative:
+			add	hl,bc
+			jr	c,@lineInDisplay
+			call	@calcTableIndex
+			jr	@prepNextRow
+@lineInDisplay:
+			ld	de,(@lastLine)
+			or	a
+			sbc	hl,de
+			jr	nz,@renderLine
+			ld	a,(@tableIndexDirection)
+			and	a
+			ret	nz			; EXIT HERE, we have completed both directions
+			inc	a
+			ld	(@tableIndexDirection),a
 
-			ld	b,a
-			ld	a,(@lastLineLo)		; does line = last line?
-			cp	b
-			jr	nz,@notLastRow	; if we have reached last line exit
-			ret
-@notLastRow:
-			; calc table index - incase we have a renderable line coming up
-			ld	hl,(@deltaTableIndex)	; step in table index
-			ld	bc,(@tableIndex)	; current integer and fraction of index
-			add	hl,bc			; h = integer index
-			ld	(@tableIndex),hl	; save new current integer and fraction of index for next time
+			; setup lastline to ycoord + radius
+			ld	hl,(@yCoord)
+			ld	a,(@radius)
+			add	hl,a
+			ld	bc,192
+			call	clampHLBy0AndBC
+			ld	(@lastLine),hl		; bottom Y coord (for top half of circle)
 
+@renderLine:
 			; calc line width
-			ld	a,(@tableIndex)		; A = integer table index
+			ld	a,(@tableIndex + 1)	; A = integer table index
 			ld	hl,@lineWidths		; HL = table address
 			add	hl,a			; HL current line width address
 			ld	e,(hl)			; half line width (0-255)
 			ld	a,(@radius)
 			ld	d,a
 			mul	d,e			; d = line width * radius / 256
+			call	@calcTableIndex
 
 			; calc left and right sides of line
 			; right first
@@ -1086,8 +1105,8 @@ mycircleL2F:
 			add	hl,a
 
 			; clamp right
-			call	@clampHLToA
-			ld	(@rightLo),a
+			call	@clampXCoord
+			ld	(@right),a
 
 			; calc left
 			ld	hl,(@xCoord)
@@ -1096,66 +1115,78 @@ mycircleL2F:
 			sbc	hl,bc
 
 			; clamp left
-			call	@clampHLToA
-			ld	(@leftLo),a
-
-			; get actual line width
-			ld	a,(@leftLo)
-			ld	c,a
-			ld	a,(@rightLo)		; A = line width
-			sub	a,c
-			jr	z,@nextLine		; if no width dont render
-			ld	e,a			; E = line width
+			call	@clampXCoord
+			ld	(@left),a
 
 			; start rendering
 
+			; get left and right pixel coords
+			ld	de,(@left)		; DE = left and right
+			ld	a,d
+			cp	e			; check left and right
+			jr	z,@prepNextRow		; if same, skip rendering this line
+
 			; get screen address at (left, line)
-			ld	a,(@lineLo)
+			ld	a,(@line)
 			ld	b,a
-			ld	a,(@leftLo)
+			ld	a,(@left)
 			ld	c,a
 			call	get_pixel_address	; HL = first pixel display address
 
-			ld	b,e			; B = line width
+			; render
 			ld	a,(@colour)
-@nextPixel:
-			ld	(hl),a
-			inc	hl
-			djnz	@nextPixel
+			ld	(draw_horz_line_colour),a
+			call	draw_horz_line
 
-			; ld	a,(@leftLo)
-			; ld	d,a
-			; ld	a,(@rightLo)
-			; ld	e,a
-			; call draw_horz_line
-
-@nextLine:		;get ready to start rendering next line
-			ld	a,(@lineLo)
+@prepNextRow:		;get ready to start rendering next line
+			ld	a,(@line)
 			inc	a
-			jr	@nextRow
+			ld	(@line),a
+			jp	@nextRow
 
-@clampHLToA:	; clamp 0 >= HL <= 255, A is result
+
+
+@clampXCoord:		; clamp 0 >= HL <= 255, A is result
 			ld	a,h			; Check if H >= 1 (HL >= 256)
 			or	a
 			jr	z,@clampDone
+			and	128
+			jr	z,@rightside
+			xor	a
+			ret
+@rightside:
 			ld	a,255			; If H > 0, HL >= 256, so clamp to 255
 			ret
 @clampDone:		; HL is betwen 0 and 255 (inclusive)
 			ld	a,l
 			ret
 
+; Destroys A, BC & HL
+@calcTableIndex:	; calc table index - incase we have a renderable line coming up
+			ld	bc,(@deltaTableIndex)	; step in table index
+			ld	hl,(@tableIndex)	; current integer and fraction of index
+			ld	a,(@tableIndexDirection)
+			and	a
+			jr	nz,@subIndex
+			add	hl,bc			; h = integer index
+			jr	@updateIndex
+@subIndex:		sbc	hl,bc			; h = integer index
+@updateIndex:
+			ld	(@tableIndex),hl	; save new current integer and fraction of index for next time
+			ret
 
 @data:
 @colour:		db 0	; pixel colour
 @radius:		db 0	; circle radius
 @tableIndex:		dw 0	; integer and fraction of index into line width table
 @deltaTableIndex:	dw 0	; full step of change in index into line width table
-@lineLo: 		db 0	; lo current line
-@lastLineLo:		db 0	; end line
+@tableIndexDirection:	db 0	; 0 = add, 1 = subtract deltaTableIndex from tableIndex
+@line:	 		dw 0	; current line
+@lastLine:		dw 0	; end line
 @xCoord:		dw 0	; x coord (middle)
 @yCoord:		dw 0	; y coord (middle)
-@leftLo:		db 0	; lo left x coord
-@rightLo:		db 0	; lo right x coord
+@left:			db 0	; lo left x coord
+@right:			db 0	; lo right x coord
 
 @lineWidths:
 	db	23, 32, 39, 45, 50, 55, 59, 63, 67, 71, 74, 77, 80, 83, 86, 89
@@ -1175,46 +1206,48 @@ mycircleL2F:
 	db	253, 253, 253, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 255
 	db	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
 
-; Divide 16-bit values (with 16-bit result)
-; In: Divide BC by divider E
-; Out: BC = result, HL = remainder
-; 1297 + 7 T-states to complete
-Div16by8:
+;BC/E ==> BC, remainder in HL
+;1382cc
+;23 bytes
+BcDivE:
 			ld d,0
 
-; Divide 16-bit values (with 16-bit result)
-; In: Divide BC by divider DE
-; Out: BC = result, HL = remainder
-; Thanks to Flyguille for the Div16 routine, taken from his MNBIOS source code
-; 1297 T-states to complete
-Div16:
-			ld	hl,0
+;BC/DE ==> BC, remainder in HL
+;1382cc
+;23 bytes
+; thanks goes to: http://z80-heaven.wikidot.com/advanced-math#toc29
+BC_Div_DE:
+			ld	hl,0    	;Accumulator
 			ld	a,b
-			ld	b,8
-@div16_Loop1:
+			ld	b,16    	;Loop counter
+@div_loop:		;shift the bits from BC (numerator) into HL (accumulator)
+			sla	c
 			rla
 			adc	hl,hl
-			sbc	hl,de
-			jr	nc,@div16_NoAdd1
+			sbc	hl,de		;Check if remainder >= denominator (HL>=DE)
+			jr	c,@div_loop_readjust
+			inc	c
+			jr	@div_loop_done
+@div_loop_readjust:	; remainder is not >= denominator, so we have to add DE back to HL
 			add	hl,de
-@div16_NoAdd1:
-			djnz	@div16_Loop1
-			rla
-			cpl
+@div_loop_done:
+			djnz	@div_loop
 			ld	b,a
-			ld	a,c
-			ld	c,b
-			ld	b,8
-@div16_Loop2:
-			rla
-			adc	hl,hl
-			sbc	hl,de
-			jr	nc,@div16_NoAdd2
-			add	hl,de
-@div16_NoAdd2:
-			djnz	@div16_Loop2
-			rla
-			cpl
-			ld	b,c
-			ld	c,a
 			ret
+
+
+; Return HL clamped between 0 and BC inclusive
+; No other registers changed
+clampHLBy0AndBC:
+			scf
+			ccf
+			sbc	hl,bc
+			jp	m,@plusBcNegative
+			ld	h,b
+			ld	l,c
+			ret
+@plusBcNegative:	add	hl,bc
+			ret	c
+@zero:			ld	hl,0
+			ret
+
